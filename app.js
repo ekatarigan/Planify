@@ -315,24 +315,50 @@ function checkFirstTimeOnboarding() {
  */
 function loadTasksData() {
   try {
-    const saved = localStorage.getItem(STORAGE_KEY) || localStorage.getItem(LEGACY_STORAGE_KEY);
-    if (saved) {
-      tasks = JSON.parse(saved);
+    // Utamakan key terbaru; jika belum ada, ambil data dari key versi lama.
+    const currentSaved = localStorage.getItem(STORAGE_KEY);
+    const legacySaved = localStorage.getItem(LEGACY_STORAGE_KEY);
+    const saved = currentSaved ?? legacySaved;
+
+    if (saved !== null) {
+      const parsed = JSON.parse(saved);
+
+      // Jangan menimpa data tersimpan yang formatnya tidak sesuai secara diam-diam.
+      if (!Array.isArray(parsed)) {
+        throw new Error("Format data tugas bukan array.");
+      }
+
+      tasks = parsed;
+
+      // Migrasikan data legacy ke key baru agar berikutnya konsisten.
+      if (currentSaved === null && legacySaved !== null) {
+        saveTasksData();
+      }
     } else {
       tasks = [...INITIAL_TASKS];
       saveTasksData();
     }
   } catch (error) {
     console.error("Gagal memuat tugas dari localStorage:", error);
+    // Jangan langsung menulis ulang storage saat data gagal dibaca.
     tasks = [...INITIAL_TASKS];
   }
 }
 
 function saveTasksData() {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks));
+    const serialized = JSON.stringify(tasks);
+    localStorage.setItem(STORAGE_KEY, serialized);
+
+    // Verifikasi bahwa browser benar-benar menyimpan data.
+    const savedBack = localStorage.getItem(STORAGE_KEY);
+    if (savedBack !== serialized) {
+      throw new Error("Verifikasi penyimpanan localStorage gagal.");
+    }
+    return true;
   } catch (error) {
     console.error("Gagal menyimpan tugas ke localStorage:", error);
+    return false;
   }
 }
 
